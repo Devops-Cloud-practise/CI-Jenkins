@@ -1,0 +1,39 @@
+---
+- hosts: "localhost"
+  tasks:
+  
+  - name: Removing Known host file from ansible host to avoid man in middle attach error
+    file:
+      path: /home/vagrant/.ssh/known_hosts
+      state: absent
+  
+  - pause: 
+      seconds: 10
+      prompt: "Wait for a min to make sure remote host is ready"
+  # - name: Wait for server to restart
+  #   local_action:
+  #   module: wait_for
+  #     host=192.168.50.4
+  #     port=22
+  #     delay=1
+  #     timeout=300
+
+- hosts: "{{ rmt_host }}"
+  remote_user: vagrant
+  tasks:
+  - name: Include Vars
+    include_vars: vars/var.yaml
+    
+  - name: Setup | authorized key upload
+    authorized_key: 
+      user: "{{ host_domain_env[rmt_host].ansible_usr_ssh }}"
+      key: "{{ lookup('file', '/home/vagrant/.ssh/id_rsa.pub') }}"
+      path: "/home/vagrant/.ssh/authorized_keys"
+      manage_dir: no
+    
+
+      #https://www.hashbangcode.com/article/ansible-ssh-setup-playbook
+#ansible-playbook   --ask-vault-pass -bk --extra-vars "rmt_host=jenkins" /vagrant/play_books/ansible_ssh_auto_set_up.yaml
+      #$ ansible-playbook -k --extra-vars "rmt_host=jenkins" /vagrant/play_books/ansible_ssh_auto_s
+
+      #http://ansible-docs.readthedocs.io/zh/stable-2.0/rst/faq.html

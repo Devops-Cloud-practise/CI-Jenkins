@@ -1,0 +1,149 @@
+---
+- hosts: "{{ rmt_host }}"
+  become: yes
+  handlers:
+  - name: restart apache2
+    service: 
+      name: apache2
+      state: restarted
+    
+  # vars:
+  #   mysql_password: root
+  #   domain: sonar
+  #   sonar_db: sonardb
+  #   sonar_user: sonar
+  #   sonar_password: verysecret
+  #   sonar_home: /opt/sonar/
+      
+  tasks: 
+  - name: Include Vars
+    include_vars: vars/var.yaml
+
+  - name: Remote Host Details
+    debug:
+      msg: "{{ansible_distribution}}_{{ansible_distribution_release}}_{{ansible_distribution_version}}_{{ ansible_os_family }}-{{ansible_architecture}}"
+
+  - include_tasks: tasks/installoraJDK8.yaml
+
+  - include_tasks: tasks/MYSQL5-6.yaml  
+
+  - include_tasks: tasks/createdb.yaml 
+   
+  - name: other dependencies 
+    apt: 
+      name: "{{ item }}"
+      update_cache: yes 
+      state: present
+    with_items:
+     - wget
+     - unzip
+     - apache2
+  
+  - name: Download Sonar
+    get_url: 
+      url: https://sonarsource.bintray.com/Distribution/sonarqube/sonarqube-6.4.zip
+      dest: /tmp/sonarqube-6.4.zip
+
+  - name: Unzip the Sonar
+    unarchive:
+      src: /tmp/sonarqube-6.4.zip
+      dest: /opt
+      copy: no
+      creates: /opt/sonar/COPYING
+
+  - name: Renaming the Dir
+    shell: >
+      mv /opt/sonarqube-6.4 /opt/sonar
+      creates=/opt/sonar/COPYING
+  
+  - name: Copy the template 
+    template: 
+      src: /vagrant/templates/sonar.properties.j2
+      dest: /opt/sonar/conf/sonar.properties
+  
+  - name: prepare sonar to run as a service 
+    template: 
+      src: /vagrant/templates/sonar.service.j2
+      dest: /etc/systemd/system/sonar.service
+
+  - name: Symlink sonar bin.
+    file:
+      src: /opt/sonar/bin/linux-x86-64/sonar.sh
+      dest: /usr/bin/sonar
+      state: link
+    register: sonar_symlink
+
+  - name: Add sonar as init script for service management.
+    file:
+      src: /opt/sonar/bin/linux-x86-64/sonar.sh
+      dest: /etc/init.d/sonar
+      state: link
+
+  - name: Ensure Sonar is running and set to start on boot.
+    service: 
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+     - sonar
+     - apache2
+     
+  - name: Allow Sonar time to build on first start.
+    pause: seconds=180
+    when: sonar_symlink.changed
+
+  - name: Make sure Sonar is responding on the configured port.
+    wait_for: port=9000 delay=3 timeout=300
+
+  - name: Enable Apache proxy modules 
+    apache2_module:
+      name: "{{ item }}"
+      state: present
+    with_items:
+     - proxy
+     - proxy_http
+  
+  - name: Copy Apache template to enable reverse proxy
+    template: 
+      src: /vagrant/templates/sonar.conf.j2
+      dest: /etc/apache2/sites-available/sonar.conf
+
+    
+  - name: a2ensite {{host_domain_env[rmt_host].user}}
+    command: a2ensite {{host_domain_env[rmt_host].user}}
+    notify:
+    - restart apache2
+
+  - name: Display Sonal url
+    debug:
+      msg: "Sonarcube is running behind Load Balancer apache. Can access directly on http://{{ inventory_hostname }}:9000"
+
+  # - name: Enable sonar Service
+  #   service:
+  #     name: sonar
+  #     state: started
+  #     enabled: yes
+  #     daemon-reload: true
+  #   register: sonar_status
+
+  # - name: print sonar Status ( Access Artifactory on nginx - http://{{ inventory_hostname }})
+  #   debug: 
+  #     var: sonar_status
+  
+  #- name: 
+   # lineinfile: 
+    #  dest: /opt/sonar/conf/sonar.properties
+     # regexp: "{{ item.regexp }}"
+      #line: "{{ item.line }}"
+    #with_items:
+    #- regexp: "^#sonar.jdbc.username"
+    # line: "sonar.jdbc.username={{ sonar_user }}"
+    #- regexp: "^#sonar.jdbc.password"
+    # line: "sonar.jdbc.password={{ sonar_password }}"
+    
+#https://docs.sonarqube.org/display/SONAR/Requirements
+#Sonar Cube supports MYSQL 5.6 or > and min 2 GB of RAM
+#https://github.com/geerlingguy/ansible-role-sonar/blob/master/tasks/main.yml
+#https://stackoverflow.com/questions/26597926/install-mysql-with-ansible-on-ubuntu  
+#https://www.howtoforge.com/tutorial/how-to-install-sonarqube-on-ubuntu-1604/
+#https://www.vultr.com/docs/how-to-install-sonarqube-on-ubuntu-16-04

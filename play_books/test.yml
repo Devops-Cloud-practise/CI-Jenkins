@@ -1,0 +1,18 @@
+---
+- hosts: "{{ rmt_host }}"
+  vars:
+    - target: sonarcube
+    - hosts:
+        smtp: smtp.max.com
+        imap: imap.max.com
+  tasks:
+  - name: Include Vars
+    include_vars: vars/var.yaml
+
+  - name: Display Sonal url
+    debug:
+      msg: "{{ansible_distribution}}_{{ansible_distribution_release}}_{{ansible_distribution_version}}_{{ ansible_os_family }}-{{ansible_architecture}}"
+
+  - name: Display Sonal url
+    debug: msg="{{ host_domain_env[rmt_host].db }}"
+  #   #debug: msg="{{ app[sonarcube].db }}"

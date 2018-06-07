@@ -1,0 +1,114 @@
+---
+
+- name: add group "tomcat"
+  group: name=tomcat
+
+- name: add user "tomcat"
+  user: name=tomcat group=tomcat home=/opt/tomcat createhome=no 
+
+- name: Create tomcat dir
+  file: 
+    path: /opt/tomcat
+    state: directory
+    owner: tomcat
+    group: tomcat
+
+- name: Tomcat | Download & Extract Tomcat
+  unarchive:
+    extra_opts: ['--strip-components=1']
+    src: http://ftp.cuhk.edu.hk/pub/packages/apache.org/tomcat/tomcat-8/v8.5.31/bin/apache-tomcat-8.5.31.tar.gz
+    remote_src: yes
+    dest: /opt/tomcat
+    owner: tomcat
+    group: tomcat
+    mode: 0750
+
+- name: Change ownership of Tomcat installation
+  file: path=/opt/tomcat/ owner=tomcat group=tomcat state=directory recurse=yes
+
+- name: Install Tomcat init script
+  copy: src=/vagrant/templates/tomcat.service.j2 dest=/etc/init.d/tomcat mode=0755
+
+- name: remove control M from init file that cause file not found error during enabling the service
+  replace: 
+    path: '/etc/init.d/tomcat'
+    regexp: '\r'
+    replace: ''
+    backup: yes
+
+- name: Start Tomcat
+  service: name=tomcat state=started enabled=yes
+
+- name: Install Nginx Apt key
+  apt_key:
+    url: "http://nginx.org/keys/nginx_signing.key"
+
+- name: Install the Nginx Repo
+  apt_repository:
+    repo: "deb http://nginx.org/packages/ubuntu/ trusty nginx"
+
+- name: Install Nginx
+  apt: 
+    update_cache: True
+    name: nginx
+    state: present
+
+- name: Restart nginx
+  service:
+    name: nginx
+    state: restarted
+
+  # Configuring ngix for jfrog 
+- name: Create dir for nginx
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - /etc/nginx/sites-available
+    - /etc/nginx/sites-enabled
+
+- name: Replace string in nginx file
+  replace:
+    path: /etc/nginx/nginx.conf
+    regexp: '/etc/nginx/conf.d'
+    replace: '/etc/nginx/sites-enabled'
+    backup: yes
+
+- name: Run Shell to delete all files under dir
+  shell: rm -f /etc/nginx/conf.d/*
+  args:
+    warn: false
+    
+- name: Copy the template 
+  template: 
+    src: /vagrant/templates/tomcat.conf.j2
+    dest: /etc/nginx/sites-available/tomcat.conf
+
+- name: create soft links
+  file:
+    src: /etc/nginx/sites-available/tomcat.conf
+    dest: /etc/nginx/sites-enabled/tomcat.conf
+    state: link
+
+- name: Restart nginx
+  service:
+    name: nginx
+    state: restarted 
+
+- name: Restart tomcat
+  service:
+    name: tomcat
+    state: restarted 
+
+- debug:
+      msg: "Tomcat is running behind Load Balancer nginx.  Can access directly on http://{{ inventory_hostname }} OR http://{{ inventory_hostname }}:8080"
+
+      
+  
+# - name: Change ownership of Tomcat installation
+#   file: path=/opt/tomcat/ owner=tomcat group=tomcat state=directory recurse=yes
+  
+# - name: Download Tomcat
+#   get_url: url=http://ftp.cuhk.edu.hk/pub/packages/apache.org/tomcat/tomcat-8/v8.5.31/bin/apache-tomcat-8.5.31.tar.gz dest=/opt/apache-tomcat-8.5.31.tar.gz
+#https://github.com/idealista/tomcat-role/blob/master/defaults/main.yml
+#https://github.com/ansible/ansible-examples/blob/master/tomcat-standalone/roles/tomcat/tasks/main.yml 

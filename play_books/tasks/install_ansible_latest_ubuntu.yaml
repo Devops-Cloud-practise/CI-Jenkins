@@ -1,0 +1,19 @@
+---
+- name: Add Ansible PPA
+  apt_repository: repo="ppa:ansible/ansible" update_cache=no
+- name: Update APT cache
+  apt: update_cache=yes
+- name: Install necessary packages 
+  apt: name={{ item }} state=latest install_recommends=no
+  with_items:
+    - ansible
+    - software-properties-common
+  
+- name: Display Installed ansible version
+  command: ansible --version
+  register: ansible_version
+
+- name: print ansible version
+  debug: 
+    var: ansible_version
+  

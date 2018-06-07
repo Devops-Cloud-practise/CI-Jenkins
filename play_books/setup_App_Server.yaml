@@ -1,0 +1,18 @@
+---
+- hosts: "{{ rmt_host }}"
+  become: yes
+  # handlers: 
+  #   - name: restart jenkins
+  #     service:
+  #       name: jenkins
+  #       state: restarted
+
+  tasks:
+  - name: Include Vars
+    include_vars: vars/var.yaml
+  - include_tasks: tasks/installoraJDK8.yaml 
+  - include_tasks: tasks/installTomcat.yaml 
+  
+  - name: Remote Host Details
+    debug:
+      msg: "{{ansible_distribution}}_{{ansible_distribution_release}}_{{ansible_distribution_version}}_{{ ansible_os_family }}-{{ansible_architecture}}"

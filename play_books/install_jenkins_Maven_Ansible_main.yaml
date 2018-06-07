@@ -1,0 +1,142 @@
+---
+- hosts: "{{ rmt_host }}"
+  become: yes
+  handlers: 
+    - name: restart jenkins
+      service:
+        name: jenkins
+        state: restarted
+
+  tasks:
+  - name: Include Vars
+    include_vars: vars/var.yaml
+
+  - include_tasks: tasks/install_ansible_latest_ubuntu.yaml
+
+  
+    
+  # - name: Copy ansible config file
+  #   copy: src={{ item.src }} dest={{ item.dest }}
+  #   with_items: 
+  #     - { src: '/vagrant/ansible_conf/ansible.cfg', dest: '/etc/ansible/ansible.cfg' }
+ 
+  - include_tasks: tasks/installoraJDK8.yaml 
+  
+  - name: Remote Host Details
+    debug:
+      msg: "{{ansible_distribution}}_{{ansible_distribution_release}}_{{ansible_distribution_version}}_{{ ansible_os_family }}-{{ansible_architecture}}"
+  
+  
+
+  # - name: Install Maven
+  #   apt:
+  #     name: maven
+  #     state: latest
+  #     update_cache: yes      
+
+        #https://awsbloglink.wordpress.com/2017/11/02/how-to-install-jenkins-using-ansible/
+
+  - name: Install required packages
+    apt: name={{ item }} state=present
+    with_items:
+      - git
+      - wget
+      - maven
+      - apache2
+   
+  - name: Installing Apache to run as Proxy.
+    service: 
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+      - apache2
+    
+  - name: Enable Apache proxy modules 
+    apache2_module:
+      name: "{{ item }}"
+      state: present
+    with_items:
+     - proxy
+     - proxy_http
+  
+  - name: Copy Apache template to enable reverse proxy
+    template: 
+      src: /vagrant/templates/000-default.conf.j2
+      dest: /etc/apache2/sites-available/000-default.conf
+
+  - name: Install Jenkins Apt key
+    apt_key:
+      url: "https://pkg.jenkins.io/debian/jenkins-ci.org.key"
+
+  - name: Install the Jenkins Repo
+    apt_repository:
+      repo: "deb http://pkg.jenkins.io/debian-stable binary/"
+
+  - name: Install Jenkins
+    apt: 
+      update_cache: True
+      name: jenkins
+      state: present
+      #notify: restart jenkins
+    
+  - name: Copy jenkins template to enable reverse proxy
+    template: 
+      src: /vagrant/templates/jenkins.j2
+      dest: /etc/default/jenkins
+
+  - name: Checking if .ssh dir exist under Jenkins HOMEDIR
+    file:
+      path: "{{ host_domain_env[rmt_host].homedir }}.ssh" 
+    register: folder_stats 
+  
+  - name: Creating .ssh dir under jenkins home if does not exist.
+    file:
+      path: "{{ host_domain_env[rmt_host].homedir }}.ssh"
+      state: directory
+      owner: "{{ host_domain_env[rmt_host].jenkins_usr_ssh }}"
+      group: "{{ host_domain_env[rmt_host].jenkins_usr_ssh }}"
+      mode: 0700    
+
+  - name: Copy public and private keys from local ansible to jenkins homedir.
+    copy: src={{ item.src }} dest={{ item.dest }} group=jenkins owner=jenkins mode=0600
+    with_items:
+      - { src: '/home/vagrant/.ssh/id_rsa', dest: "{{ host_domain_env[rmt_host].homedir }}.ssh/id_rsa" }
+      - { src: '/home/vagrant/.ssh/id_rsa.pub', dest: "{{ host_domain_env[rmt_host].homedir }}.ssh/id_rsa.pub" }
+  
+  - name: Making sure Private key has correct restricted permission
+    file:
+      path: "{{ host_domain_env[rmt_host].homedir }}.ssh/id_rsa"
+      owner: jenkins
+      group: jenkins
+      mode: 0600     
+
+  - name: Restart Jenkins,apache2
+    service:
+      name: "{{ item }}"
+      state: restarted
+    with_items:
+      - jenkins
+      - apache2
+  
+  - name: Allow Jenkins time to build on first start.
+    pause: seconds=180
+    
+  - name: Make sure Jenkins is responding on the configured port.
+    wait_for: port=8080 delay=3 timeout=300
+
+  - debug:
+      msg: "Jenkins is running behind Apache.  Can access directly on http://{{ inventory_hostname }}/jenkins or http://{{ inventory_hostname }}:8080/jenkins"
+
+
+  - name: Display Admin Password
+    shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+    changed_when: false
+    register: result
+
+  - name: print init password jenkins
+    debug: 
+      var: result.stdout
+
+       #https://opensourceforu.com/2017/08/devops-series-ansible-deployment-jenkins/
+       #https://www.build-business-websites.co.uk/jenkins-behind-apache-proxy/comment-page-1/

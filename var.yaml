@@ -1,0 +1,26 @@
+host_domain_env:
+  sonarcube:
+    db: sonardb
+    user: sonar
+    password: verysecret
+    mysqlusr: root
+    mysqlpass: root
+    homedir:  /opt/sonar/
+    ansible_usr_ssh: vagrant
+    ansible_pass_ssh: vagrant
+
+  jfrog:
+    db: artdb
+    user: artifactory
+    password: verysecret
+    mysqlusr: root
+    mysqlpass: root
+    homedir: /opt/jfrog/artifactory
+    ansible_usr_ssh: vagrant
+    ansible_pass_ssh: vagrant
+
+  jenkins:
+    ansible_usr_ssh: vagrant
+    ansible_pass_ssh: vagrant
+
+  

@@ -1,0 +1,158 @@
+---
+#- hosts: webservers
+- hosts: "{{ rmt_host }}"
+  become: yes
+  # vars:
+  #   mysql_password: root
+  #   jfrog_db: artdb
+  #   jfrog_user: artifactory
+  #   jfrog_password: verysecret
+  #   jfrog_home: /opt/jfrog/artifactory
+  
+  
+  tasks: 
+  - name: Include Vars
+    include_vars: vars/var.yaml
+  
+  - name: Remote Host Details
+    debug:
+      msg: "{{ansible_distribution}}_{{ansible_distribution_release}}_{{ansible_distribution_version}}_{{ ansible_os_family }}-{{ansible_architecture}}"
+
+  - include_tasks: tasks/installoraJDK8.yaml
+
+  - include_tasks: tasks/MYSQL5-6.yaml  
+
+  - include_tasks: tasks/createdb.yaml 
+  
+      
+  # Install Nginx from nginx.org repository instead of from ubuntu repository. The reason is that nginx.org repository provide newer version of nginx.
+
+  - name: Install Nginx Apt key
+    apt_key:
+        url: "http://nginx.org/keys/nginx_signing.key"
+
+  - name: Install the Nginx Repo
+    apt_repository:
+        repo: "deb http://nginx.org/packages/ubuntu/ trusty nginx"
+
+  - name: Install Nginx
+    apt: 
+      update_cache: True
+      name: nginx
+      state: present
+
+  - name: Restart nginx
+    service:
+      name: nginx
+      state: restarted
+
+  # Configuring ngix for jfrog 
+  - name: Create dir for nginx
+    file:
+      path: "{{ item }}"
+      state: directory
+    with_items:
+    - /etc/nginx/sites-available
+    - /etc/nginx/sites-enabled
+
+  - name: Replace string in nginx file
+    replace:
+      path: /etc/nginx/nginx.conf
+      regexp: '/etc/nginx/conf.d'
+      replace: '/etc/nginx/sites-enabled'
+      backup: yes
+
+  - name: Run Shell to delete all files under dir
+    shell: rm -f /etc/nginx/conf.d/*
+    args:
+      warn: false
+    
+  - name: Copy the template 
+    template: 
+      src: /vagrant/templates/artifactory.conf.j2
+      dest: /etc/nginx/sites-available/artifactory.conf
+
+  - name: create soft links
+    file:
+      src: /etc/nginx/sites-available/artifactory.conf
+      dest: /etc/nginx/sites-enabled/artifactory.conf
+      state: link
+
+  - name: Restart nginx
+    service:
+      name: nginx
+      state: restarted 
+
+  - name: Install Jfrog Apt key
+    apt_key:
+        url: "https://bintray.com/user/downloadSubjectPublicKey?username=jfrog"
+
+  - name: Install the Jfrog Repo
+    apt_repository:
+        repo: "deb https://bintray.com/artifact/download/jfrog/artifactory-debs trusty main"
+
+  - name: Install JFrog Artifactory
+    apt: 
+      name: jfrog-artifactory-oss
+      update_cache: True
+      state: present
+      force: yes
+
+  - name: Check if JDBC connector for MYSQL if already present 
+    stat:
+      path: "{{host_domain_env[rmt_host].homedir}}/tomcat/lib/mysql-connector-java-5.1.24.jar"
+    register: jdbc_installed
+
+  - name: download jdbc connector for mysql
+    get_url:
+      url: http://repo.jfrog.org/artifactory/remote-repos/mysql/mysql-connector-java/5.1.24/mysql-connector-java-5.1.24.jar
+      dest: "{{host_domain_env[rmt_host].homedir}}/tomcat/lib/mysql-connector-java-5.1.24.jar"
+    when: not jdbc_installed.stat.exists
+
+  - name: copy db.properties for mysql user
+    template: 
+      src: /vagrant/templates/db.properties.j2
+      dest: /etc/opt/jfrog/artifactory/db.properties
+      owner: "{{ host_domain_env[rmt_host].user }}"
+      group: "{{ host_domain_env[rmt_host].user }}"
+
+  - name: Enable Jfrog Service
+    service:
+      name: artifactory
+      state: started
+      enabled: yes
+    register: Jfrog_status
+  
+  - name: print Jfrog Status ( Access Artifactory on nginx - http://{{ inventory_hostname }})
+    debug: 
+      var: Jfrog_status 
+  
+  - debug:
+      msg: "Artifactory is running behind Load Balancer nginx.  Can access directly on http://{{ inventory_hostname }}:8081 "
+
+      
+  
+#https://stackoverflow.com/questions/26597926/install-mysql-with-ansible-on-ubuntu  
+
+# https://hostpresto.com/community/tutorials/how-to-install-jfrog-artifactory-on-ubuntu-14-04/
+
+# https://medium.com/@celsoagra/how-to-configure-artifactory-jfrog-with-postgres-in-the-vagrant-vm-a39c7ed999f8
+
+# Note - Ignore that anginx part .. This needs min 2 GB of Memory ...
+
+# Java HotSpot(TM) 64-Bit Server VM warning: INFO: os::commit_memory(0x0000000080000000, 536870912
+# , 0) failed; error='Cannot allocate memory' (errno=12)
+# #
+# # There is insufficient memory for the Java Runtime Environment to continue.
+# # Native memory allocation (mmap) failed to map 536870912 bytes for committing reserved memory.
+# # An error report file with more information is saved as:
+# # /tmp/hs_err_pid7200.log
+
+# Access jfrog -
+# http://192.168.33.12:8081
+
+# https://stackoverflow.com/questions/22869402/jenkins-deploying-war-files-from-artifactory
+# https://stackoverflow.com/questions/22869402/jenkins-deploying-war-files-from-artifactory/22871424#22871424
+
+# http://192.168.33.12:8081/artifactory/project-jenkins/%24%7BBUILD_NUMER%7D/target/app-1.0-SNAPSHOT.jar
+# http://codegist.net/search/ansible-playbook-to-install-tomcat/8

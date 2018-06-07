@@ -1,0 +1,23 @@
+---
+- name: Create DB {{ host_domain_env[rmt_host].db }}
+  mysql_db:
+    #name: "{{ app_db }}"
+    name: "{{ host_domain_env[rmt_host].db }}"
+    state: present
+    login_user: root
+    login_password: "{{ host_domain_env[rmt_host].mysqlpass }}"
+
+- name: Create {{ host_domain_env[rmt_host].user }} user and assign rights to DB
+  mysql_user: 
+    name:  "{{ host_domain_env[rmt_host].user }}"
+    password: "{{ host_domain_env[rmt_host].password }}"
+    login_user: root 
+    login_password: "{{ host_domain_env[rmt_host].mysqlpass }}" 
+      #priv: "artdb.*:ALL,GRANT"
+    priv: "{{ host_domain_env[rmt_host].db }}.*:ALL,GRANT"
+    state: present
+
+- name: Start MySQL service
+  service:
+    name: mysql
+    state: restarted   
