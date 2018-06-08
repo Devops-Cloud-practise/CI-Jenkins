@@ -36,11 +36,16 @@ _Maven_Ansible_main.yaml
  ---------------------------------------------------------------------------------------------------------------
                   Provisioning Hosts
 ---------------------------------------------------------------------------------------------------------------
-ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=jenkins" /vagrant/play_books/install_jenkins_M
+
+a. ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=jenkins" /vagrant/play_books/install_jenkins_M
 aven_Ansible_main.yaml
-ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=sonarcube" /vagrant/play_books/install_sonarcu
+
+b. ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=sonarcube" /vagrant/play_books/install_sonarcu
 be_main.yaml
-ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=jfrog" /vagrant/play_books/install_jfrog_Artif
+
+c. ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=jfrog" /vagrant/play_books/install_jfrog_Artif
 actory_main.yaml
-ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=appserver" /vagrant/play_books/setup_App_Serve
+
+d. ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=appserver" /vagrant/play_books/setup_App_Serve
+
    
