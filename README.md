@@ -14,15 +14,19 @@ Once all VMs are set up ssh to ansible machines and strt running playbooks ---
 ---------------------------------------------------------------------------------------------------------------
 Note: Before running these playbooks make sure you have followed the steps given in link https://www.hashbangcode.com/article/ansible-ssh-setup-playbook
             
-ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=jenkins" /vagrant/p
+a. ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=jenkins" /vagrant/p
 lay_books/ansible_ssh_auto_set_up.yaml
- ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=jfrog" /vagrant/pla
+
+b. ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=jfrog" /vagrant/pla
 y_books/ansible_ssh_auto_set_up.yaml
-ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=sonarcube" /vagrant
+
+c. ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=sonarcube" /vagrant
 /play_books/ansible_ssh_auto_set_up.yaml
-ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=appserver" /vagrant
+
+d. ansible-playbook -e "ansible_user=vagrant" --ask-vault-pass -bk --extra-vars "rmt_host=appserver" /vagrant
 /play_books/ansible_ssh_auto_set_up.yaml
-ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=appserver" /vagrant/play_books/install_jenkins
+
+e. ansible-playbook --ask-vault-pass -b --extra-vars "rmt_host=appserver" /vagrant/play_books/install_jenkins
 _Maven_Ansible_main.yaml
    
  rmt_host variable values must match from hosts file groups ...these in turns looks for var file ( encrypted using vault to get necessayr properties related to diff hosts...) you can refer under var/var2.yml which is exact copy of encrpted var.yaml.. make sure you diff passwords as i have used generic passwords ...
